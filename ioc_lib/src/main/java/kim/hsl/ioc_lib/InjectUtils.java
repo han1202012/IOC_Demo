@@ -3,7 +3,10 @@ package kim.hsl.ioc_lib;
 import android.app.Activity;
 import android.view.View;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 public class InjectUtils {
     /**
@@ -16,6 +19,9 @@ public class InjectUtils {
 
         // 注入视图组件
         injectViews(activity);
+
+        // 注入事件
+        injectEvents(activity);
     }
 
     /**
@@ -65,5 +71,88 @@ public class InjectUtils {
                 e.printStackTrace();
             }
         }
+    }
+
+    /**
+     * 注入事件
+     */
+    private static void injectEvents(Activity activity) {
+        // 获取 Class 字节码对象
+        Class<? extends Activity> clazz = activity.getClass();
+        // 获取所有方法
+        Method[] methods = clazz.getDeclaredMethods();
+
+        // 循环遍历类的方法
+        for (int i = 0; i < methods.length; i ++) {
+            // 获取方法的所有注解
+            Annotation[] annotations = methods[i].getDeclaredAnnotations();
+
+            // 遍历所有的注解
+            for (int j = 0; j < methods.length; j ++) {
+                // 获取注解类型
+                Class<? extends Annotation> annotationType = annotations[j].annotationType();
+                // 获取 @EventBase 注解
+                EventBase eventBase = annotationType.getAnnotation(EventBase.class);
+                if (eventBase == null) {
+                    // 如果没有获取到 EventBase 注解 , 执行下一次循环
+                    continue;
+                }
+
+                // 如果获取到了 EventBase 注解 , 则开始获取事件注入的三要素
+                /*
+                通过反射执行下面的方法
+                textView.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+
+                    }
+                });
+                 */
+                // 点击事件 View.setOnClickListener
+                String listenerSetter = eventBase.listenerSetter();
+                // 监听器类型 View.OnClickListener
+                Class<?> listenerType = eventBase.listenerType();
+                // 事件触发回调方法 public void onClick(View v)
+                String callbackMethod = eventBase.callbackMethod();
+
+                // 通过反射注入事件 , 设置组件的点击方法
+
+                // 通过反射获取注解中的属性
+                //      int[] value(); // 接收 int 类型数组
+                try {
+                    // 通过反射获取 OnClick 注解的 int[] value() 方法
+                    Method valueMethod = annotationType.getDeclaredMethod("value");
+                    // 调用 value() 方法 , 获取视图组件 ID 数组
+                    int[] viewIds = (int[]) valueMethod.invoke(annotations[j]);
+
+                    // 遍历 ID 数组
+                    for (int k = 0; k < viewIds.length; k ++) {
+                        // 获取组件实例对象
+                        View view = activity.findViewById(viewIds[k]);
+                        if (view == null) {
+                            continue;
+                        }
+
+                        // 获取 View 视图组件的 listenerSetter 对应方法
+                        //      这里是 View.setOnClickListener
+                        //      参数一是方法名称 , 参数二是方法参数类型
+                        Method listenerSetterMethod =
+                                view.getClass().getMethod(listenerSetter, listenerType);
+
+                        //
+                        //listenerSetterMethod.invoke(view, )
+                    }
+
+                } catch (NoSuchMethodException e) {
+                    e.printStackTrace();
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                } catch (InvocationTargetException e) {
+                    e.printStackTrace();
+                }
+
+            }
+        }
+
     }
 }
