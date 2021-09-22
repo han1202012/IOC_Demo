@@ -1,12 +1,16 @@
 package kim.hsl.ioc_lib;
 
 import android.app.Activity;
+import android.icu.lang.UProperty;
 import android.view.View;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.HashMap;
+import java.util.Map;
 
 public class InjectUtils {
     /**
@@ -88,7 +92,7 @@ public class InjectUtils {
             Annotation[] annotations = methods[i].getDeclaredAnnotations();
 
             // 遍历所有的注解
-            for (int j = 0; j < methods.length; j ++) {
+            for (int j = 0; j < annotations.length; j ++) {
                 // 获取注解类型
                 Class<? extends Annotation> annotationType = annotations[j].annotationType();
                 // 获取 @EventBase 注解
@@ -115,6 +119,13 @@ public class InjectUtils {
                 // 事件触发回调方法 public void onClick(View v)
                 String callbackMethod = eventBase.callbackMethod();
 
+                // 拦截 callbackMethod 方法 , 执行 method[i] 方法
+                //      这个 method[i] 方法就是在 MainActivity 中用户自定义方法
+                //      被 OnClick 注解修饰的方法
+                //      将其封装到 Map 集合中
+                Map<String, Method> methodMap = new HashMap<>();
+                methodMap.put(callbackMethod, methods[i]);
+
                 // 通过反射注入事件 , 设置组件的点击方法
 
                 // 通过反射获取注解中的属性
@@ -139,8 +150,16 @@ public class InjectUtils {
                         Method listenerSetterMethod =
                                 view.getClass().getMethod(listenerSetter, listenerType);
 
-                        //
-                        //listenerSetterMethod.invoke(view, )
+                        // 获取监听器 View.OnClickListener 接口的代理对象
+                        EventInvocationHandler eventInvocationHandler =
+                                new EventInvocationHandler(activity, methodMap);
+                        Object proxy = Proxy.newProxyInstance(
+                                listenerType.getClassLoader(),  // 类加载器
+                                new Class<?>[]{listenerType},   // 接口数组
+                                eventInvocationHandler);        // 调用处理程序
+
+                        // 执行 View 的 setOnClickListener 方法, 为其设置点击事件
+                        listenerSetterMethod.invoke(view, proxy);
                     }
 
                 } catch (NoSuchMethodException e) {
